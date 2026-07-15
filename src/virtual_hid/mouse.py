@@ -12,12 +12,16 @@ Usage:
 The mixin accesses self._api (_CgAPI instance) and uses cg_event_ref context manager for cleanup.
 """
 
+import logging
 import time
+
 from ._core import (
     kCGEventLeftMouseDown, kCGEventLeftMouseUp, kCGEventScrollWheel,
     kCGMouseButtonLeft, kCGMouseButtonRight, kCGMouseButtonCenter,
     cg_event_ref,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class MouseMixin:
@@ -26,12 +30,28 @@ class MouseMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    @property
+    def _mouse_available(self) -> bool:
+        """Check if event source was successfully created (required for mouse events)."""
+        return bool(getattr(self._api, "_event_source", 0))
+
     def _post_click(self, event_type: int, x: float, y: float, button_code: int):
-        """Helper to create, post, and release a mouse event."""
+        """Helper to create, post, and release a mouse event.
+
+        Raises RuntimeError if the CoreGraphics event source is unavailable
+        (e.g., Accessibility permission denied). This prevents silent failures
+        where mouse clicks appear to succeed but inject no events.
+        """
+        if not self._mouse_available:
+            raise RuntimeError(
+                "Mouse injection requires a valid CGEventSource — Accessibility permissions may be needed. "
+                "Keyboard-only mode is active."
+            )
+
         with cg_event_ref(
             self._api,
             self._api.create_mouse_event(
-                self._event_source, event_type, x, y, button_code
+                self._event_source, event_type, (x, y), button_code
             )
         ) as evt:
             if evt:

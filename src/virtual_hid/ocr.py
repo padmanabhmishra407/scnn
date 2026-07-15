@@ -2,7 +2,7 @@
 """
 OCR module for Vision/UI Reading capability.
 
-Primary: Uses AppleVision framework via osascript (zero deps, macOS-native).
+Primary: Apple Vision framework directly via pyobjc (macOS-native, no subprocess).
 Fallback: tesseract-ocr via subprocess (requires `brew install tesseract`).
 
 Usage:
@@ -10,117 +10,107 @@ Usage:
     results = ocr_image(screenshot)  # Returns list of text regions with bounding boxes
 """
 
+import logging
+import objc
+import os
 import subprocess
+import tempfile
 from typing import List, Dict, Any, Optional
-from PIL import Image
 
-
-def _run_osascript(command: str) -> Optional[str]:
-    """Run an AppleScript command and return stdout. Returns None on failure."""
-    try:
-        result = subprocess.run(
-            ["osascript", "-e", command],
-            capture_output=True, text=True, check=False, timeout=30,
-        )
-        if result.returncode != 0:
-            print(f"[ocr] osascript stderr: {result.stderr.strip()}")
-            return None
-        return result.stdout.strip()
-    except subprocess.TimeoutExpired:
-        print("[ocr] osascript timed out after 30 s")
-        return None
-    except Exception as exc:
-        print(f"[ocr] osascript unexpected error: {exc}")
-        return None
+logger = logging.getLogger(__name__)
 
 
 def _vision_ocr(image_path: str) -> Optional[str]:
-    """Run AppleScript that uses the Vision framework to recognise text.
+    """Run Vision framework OCR directly via pyobjc (no subprocess).
+
+    Uses ``NSData.dataWithContentsOfFile_`` → ``NSBitmapImageRep`` → CGImageRef
+    to load the image, then runs ``VNRecognizeTextRequest`` on a
+    ``VNImageRequestHandler`` and extracts per-observation top candidates.
 
     Returns raw newline-delimited text (one region per line), or None on any
     failure so callers can try a fallback.
     """
-    # Escape backslashes and double-quotes in the path for AppleScript safety.
-    safe_path = image_path.replace("\\", "\\\\").replace('"', '\\"')
+    try:
+        from AppKit import NSData, NSBitmapImageRep  # noqa: F401 — imported for side-effect availability
+        from Foundation import NSArray
+        from Vision import VNRecognizeTextRequest, VNImageRequestHandler, VNRequestTextRecognitionLevelAccurate
 
-    script = f"""use framework "Vision"
-use framework "AppKit"
+        # Load image bytes and create CGImageRef.
+        data = NSData.dataWithContentsOfFile_(image_path)
+        if data is None:
+            logger.debug("[ocr] NSData could not read %s", image_path)
+            return None
 
-try
-    set imagePath to "{safe_path}"
-    set theImage to current application's NSImage's alloc()'s initWithContentsOfFile:imagePath
-    if theImage is missing value then error "Could not load image from disk"
-    set cgImage to theImage's CGImageForProposedRect:missing value context:missing value hints: missing value
+        rep = NSBitmapImageRep.alloc().initWithData_(data)
+        if rep is None:
+            logger.debug("[ocr] NSBitmapImageRep initWithData_ failed for %s", image_path)
+            return None
 
-on error errMsg
-    return "ERROR|" & errMsg
-end try
+        cg_image = rep.CGImage()
+        if cg_image is None:
+            logger.debug("[ocr] CGImage extraction failed for %s", image_path)
+            return None
 
--- Configure recognise-text request with accurate level.
-set textRequest to current application's VNRecognizeTextRequest's new()
-textRequest's setAccuracy:(current application's VNAccuracyAccurate)
+        # Configure text recognition request.
+        request = VNRecognizeTextRequest.new()
+        request.setRecognitionLevel_(VNRequestTextRecognitionLevelAccurate)
 
-try
-    set handlerObj to current application's VNImageRequestHandler's alloc()'s initWithCGImage:cgImage options:(missing value)
+        # Create handler and run recognition.
+        handler = VNImageRequestHandler.alloc().initWithCGImage_options_(cg_image, None)
+        if handler is None:
+            logger.debug("[ocr] VNImageRequestHandler creation failed for %s", image_path)
+            return None
 
-    if handlerObj is missing value then
-        return "HANDLER_ERROR"
-    end if
+        arr = NSArray.arrayWithObject_(request)
+        ok, err_out = handler.performRequests_error_(arr, objc.NULL)
 
-    -- Run the request (this will populate 'results')
-    set results to {{}}
-    try
-        handlerObj.performRequests:textRequest error:(reference to results)
+        if not ok and err_out is not None:
+            desc = getattr(err_out, "description", lambda: str(err_out))() or "unknown error"
+            logger.debug("[ocr] Vision performRequests failed: %s", desc)
+            return None
 
-        if (count of results)'s contents is not 0 then
-            -- Extract first result for demonstration.
-            set firstObs to item 1 of results' contents
-            set topCandidate to firstObs's topCandidates(1)'s item 1
-            set extractedText to topCandidate's string()
+        # Extract recognized text from results.
+        results = request.results()
+        lines = []
+        for obs in results:
+            top_cands = obs.topCandidates_(1)
+            if len(top_cands) > 0:
+                lines.append(top_cands[0].string())
+            else:
+                lines.append(obs.string())
 
-            return "TEXT:" & extractedText
-        else
-            return "NO_TEXT_FOUND"
-        end if
+        return "\n".join(lines)
 
-    on error perfErr
-        return "PERF_ERROR|" & perfErr
-    end try
-
-on error handlerErr
-    return "HANDLER_ERROR|" & handlerErr
-end try"""
-
-    raw = _run_osascript(script)
-    if raw is None:
-        print(f"[ocr] osascript Vision framework call failed")
+    except ImportError as exc:
+        logger.debug("[ocr] pyobjc Vision framework unavailable: %s", exc)
+        return None
+    except Exception as exc:  # pragma: no cover — defensive
+        logger.debug("[ocr] Vision OCR unexpected error: %s", exc)
         return None
 
-    # Parse the result.
-    if raw.startswith("ERROR|"):
-        print(f"[ocr] AppleScript error: {raw[6:]}")
-        return None
 
-    # Check for specific error conditions.
-    if raw.startswith("HANDLER_ERROR"):
-        print("[ocr] Vision handler creation failed")
-        return None
-    elif raw.startswith("PERF_ERROR|"):
-        print(f"[ocr] Vision perform request error: {raw[12:]}")
-        return None
-    elif raw == "NO_TEXT_FOUND":
-        print("[ocr] No text found in image")
-        return ""
-
-    # Extract the actual text.
-    if raw.startswith("TEXT:"):
-        return raw[5:]  # Strip "TEXT:" prefix
-
-    return raw
+def _tesseract_ocr(image_path: str) -> Optional[str]:
+    """Try to OCR using tesseract if installed."""
+    try:
+        result = subprocess.run(
+            ['tesseract', image_path, '-', '--psm', '6'],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+    return None
 
 
-def ocr_image(image: Image.Image) -> List[Dict[str, Any]]:
+def ocr_image(image) -> List[Dict[str, Any]]:
     """Extract text regions from an image using Apple Vision framework.
+
+    Tries three paths in order:
+      1. Apple Vision framework directly via pyobjc (``_vision_ocr``).
+      2. tesseract-ocr subprocess fallback (``_tesseract_ocr``) if ``brew install
+         tesseract`` is available on the system.
+      3. Empty list with a warning log when both fail.
 
     Args:
         image: PIL Image to OCR.
@@ -128,22 +118,37 @@ def ocr_image(image: Image.Image) -> List[Dict[str, Any]]:
     Returns:
         List of dicts with 'text', 'confidence', 'bbox' (tuple of x,y,w,h).
     """
-    if not isinstance(image, Image.Image):
-        print("[ocr] input is not a PIL Image")
+    try:
+        from PIL import Image as _PILImage
+    except ImportError:
+        logger.error(
+            "[ocr] PIL (Pillow) is required but not installed. "
+            "Install with `pip install -r requirements.txt`."
+        )
         return []
 
-    import tempfile, os
+    if not isinstance(image, _PILImage.Image):
+        logger.warning("[ocr] input is not a PIL Image")
+        return []
+
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             image.save(tmp.name, "PNG")
             tmp_path = tmp.name
 
-        # Run Vision OCR.
+        # Path 1: Apple Vision framework.
         text = _vision_ocr(tmp_path)
 
         if not text or len(text.strip()) == 0:
-            print("[ocr] No text extracted from image")
+            logger.debug("[ocr] Vision OCR returned empty; trying tesseract fallback.")
+            text = _tesseract_ocr(tmp_path)
+
+        if not text or len(text.strip()) == 0:
+            logger.warning(
+                "[ocr] All OCR paths exhausted (Vision + tesseract). "
+                "Install tesseract via `brew install tesseract` for a secondary fallback."
+            )
             return []
 
         # Split into lines and create regions.
@@ -153,9 +158,7 @@ def ocr_image(image: Image.Image) -> List[Dict[str, Any]]:
         return [{"text": line, "confidence": 0.9, "bbox": (0, 0, w, h)} for line in lines]
 
     except Exception as e:
-        print(f"[ocr] unexpected error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("[ocr] unexpected error during OCR")
         return []
     finally:
         if tmp_path is not None:
@@ -165,7 +168,7 @@ def ocr_image(image: Image.Image) -> List[Dict[str, Any]]:
                 pass
 
 
-def ocr_text_from_region(image: Image.Image, x: int, y: int, width: int, height: int) -> str:
+def ocr_text_from_region(image, x: int, y: int, width: int, height: int) -> str:
     """Extract text from a specific region of an image.
 
     Args:
@@ -178,7 +181,7 @@ def ocr_text_from_region(image: Image.Image, x: int, y: int, width: int, height:
     """
     cropped = image.crop((x, y, min(x + width, image.width), y + height))
     results = ocr_image(cropped)
-    return " ".join(r["text"] for r in results if r["text"])
+    return " ".join(r["text"] for r in results if r.get("text"))
 
 
 def bpe_tokenize(text: str, max_tokens: int = 50) -> List[str]:
@@ -278,7 +281,7 @@ if __name__ == "__main__":
 
     # Run OCR.
     results = ocr_image(img)
-    print(f"📝 Extracted {len(results)} text regions:")
+    print(f"Extracted {len(results)} text regions:")
     for r in results:
         print(f"   '{r['text']}' (confidence: {r['confidence']:.2f})")
 

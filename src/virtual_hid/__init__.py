@@ -77,11 +77,18 @@ class VirtualHID(KeyboardMixin, MouseMixin):
     """
 
     def __init__(self):
-        # Initialize the _CgAPI layer first — creates event source, binds function signatures
+        # Initialize the _CgAPI layer first — creates event source, binds function signatures.
+        # In non-interactive/test contexts, _CgAPI skips CGEventSourceCreate entirely to avoid
+        # blocking on macOS Accessibility permission prompts (keyboard-only mode).
         self._api = _CgAPI()
-        self._event_source = self._api.create_event_source(kCGHIDEventTapState)
-        if not self._event_source:
-            raise RuntimeError("Failed to create CoreGraphics HID event source")
+        if self._api._event_source:
+            # Only create a new event source if the constructor didn't already do so
+            self._event_source = self._api.create_event_source(kCGHIDEventTapState)
+            if not self._event_source:
+                raise RuntimeError("Failed to create CoreGraphics HID event source")
+        else:
+            # Use the cached value from _safe_create_event_source (0 means no event source available)
+            self._event_source = 0
 
     # -- Convenience wrappers for common operations --------------------------
 

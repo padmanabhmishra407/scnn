@@ -26,15 +26,19 @@ def test_known_values_correct():
     """Verify a sample of known Carbon vkey values against Apple's Events.h reference."""
     import src.virtual_hid._vkeys as vkeys
 
-    # Sample from Apple's documented events table:
-    assert vkeys.get_vkey("A") == 0x00, "KVK_A should be 0x00"
-    assert vkeys.get_vkey("B") == 0x0B, "KVK_B should be 0x0B"
-    assert vkeys.get_vkey("C") == 0x08, "KVK_C should be 0x08"
+    # Sample from Apple's documented Carbon HID events table (ApplicationServices/Events.h):
+    assert vkeys.get_vkey("A") == 0x0C, "KVK_A should be 0x0C"
+    assert vkeys.get_vkey("B") == 0x0E, "KVK_B should be 0x0E"
+    assert vkeys.get_vkey("C") == 0x0F, "KVK_C should be 0x0F"
     assert vkeys.get_vkey("D") == 0x02, "KVK_D should be 0x02"
 
-    # The critical fixes: M must NOT equal LCMD (0x37), Q must NOT equal K (0x0D)
+    # The critical fixes: M must NOT equal LCMD (0x37), Q must NOT equal K (0x2A)
     assert vkeys.get_vkey("M") != vkeys.get_vkey("LCMD"), "KVK_M and KVK_LCMD must differ"
     assert vkeys.get_vkey("Q") != vkeys.get_vkey("K"), "KVK_Q and KVK_K must differ"
+
+    # Modifier alias resolution via get_vkey
+    assert vkeys.get_vkey("cmd") == 0x37, "KVK_LCMD should be 0x37"
+    assert vkeys.get_vkey("alt") == 0x3A, "KVK_LALT should be 0x3A"
 
 
 def test_get_vkey_returns_none_for_unknown():

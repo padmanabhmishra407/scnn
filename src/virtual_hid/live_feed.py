@@ -27,6 +27,7 @@ Requires macOS with pyobjc (``Quartz`` module) and ``numpy``.
 from __future__ import annotations
 
 import logging
+import subprocess
 import time as _time
 import threading
 from dataclasses import dataclass, asdict
@@ -92,6 +93,13 @@ def _capture_one_cg(region: Optional[Tuple[int, int, int, int]] = None) -> Optio
 
     Returns:
         A PIL ``Image.Image`` in RGB mode on success, or ``None`` if CG capture fails for any reason.
+
+    Notes:
+        CoreGraphics returns raw pixel data with per-row padding (bytes_per_row >= width * 4).
+        Each row is aligned to a 16-byte boundary so that SIMD-friendly loads work correctly.
+        We must account for this padding when converting the flat byte buffer into an image array,
+        otherwise rows will be misaligned and pixels will be garbled. The alpha channel in CG data
+        is stored last (RGBA or premultiplied BGRA), so we strip it and reorder channels to RGB.
     """
     if np is None:
         logger.debug(
@@ -158,21 +166,56 @@ def _capture_one_cg(region: Optional[Tuple[int, int, int, int]] = None) -> Optio
         )
         return None
 
+    # Validate bytes_per_row is consistent with expected row size (width * 4 for RGBA).
+    if bytes_per_row < width * 4:
+        logger.debug("bytes_per_row %d < width*4=%d; refusing to interpret as valid CG data.", bytes_per_row, width * 4)
+        return None
+
     try:
-        raw = np.frombuffer(bytes(cg_data), dtype=np.uint8)
-        # CG returns data in BGRA/BGRX layout — strides are row-major with padding.
-        array = np.lib.stride_tricks.as_strided(
-            raw,
-            shape=(height, width, 4),
-            strides=(bytes_per_row, 4, 1),
-            writeable=False,
-        )
+        # Extract raw pixel bytes from CGDataProvider via ctypes.
+        # cg_data is a pyobjc NSData object — get pointer and length without going through Python bytes.
+        import ctypes
+        cf = ctypes.CDLL(ctypes.util.find_library("CoreFoundation"))
+        fn_GetPtr = getattr(cf, "CFDataGetBytePtr", None)
+        fn_GetLength = getattr(cf, "CFDataGetLength", None)
 
-        # Drop the alpha channel and convert BGRX → RGB.
-        bgr = array[:, :, :3]                    # (H, W, 3) in BGR order
-        rgb = np.ascontiguousarray(bgr[:, :, ::-1], dtype=np.uint8)
+        if not (fn_GetPtr and fn_GetLength):
+            logger.debug("CoreFoundation CFData functions unavailable; falling back to screencapture.")
+            return None
 
-        return Image.frombuffer("RGB", (width, height), rgb.tobytes(), "raw", "RGB", 0, 1)
+        ptr_val = int(fn_GetPtr(cg_data))
+        length_val = int(fn_GetLength(cg_data))
+
+        if not ptr_val or length_val == 0:
+            return None
+
+        # Copy the raw bytes into a numpy uint8 array (the CG data pointer is read-only; we need
+        # a mutable contiguous copy for safe reshape/slicing).
+        raw = np.ctypeslib.as_array(
+            ctypes.cast(ptr_val, ctypes.POINTER(ctypes.c_uint8)), shape=(length_val,)
+        ).copy()
+
+        if len(raw) != height * bytes_per_row:
+            logger.debug(
+                "CG data length mismatch: got %d bytes, expected %d (height=%d * bytes_per_row=%d).",
+                len(raw), height * bytes_per_row, height, bytes_per_row,
+            )
+            return None
+
+        # Reshape into a 2D array: (height, bytes_per_row) — this includes padding bytes at the end of each row.
+        frame = raw.reshape(height, bytes_per_row)
+
+        # Slice out only the pixel columns and drop alpha channel.
+        # CGWindowListCreateImage returns kCGWindowImageDefault format which is RGBA with alpha last.
+        pixels = frame[:, : width * 4]            # (H, W*4) — drop padding bytes from each row
+        rgba = pixels.reshape(height, width, 4)    # (H, W, 4)
+
+        rgb_array = np.empty((height, width, 3), dtype=np.uint8)
+        rgb_array[:, :, 0] = rgba[:, :, 2]         # Blue → R channel
+        rgb_array[:, :, 1] = rgba[:, :, 1]         # Green stays Green
+        rgb_array[:, :, 2] = rgba[:, :, 0]         # Red → B channel (RGBA order: R, G, B, A)
+
+        return Image.frombuffer("RGB", (width, height), rgb_array.tobytes(), "raw", "RGB", 0, 1)
     except Exception as exc:  # pragma: no cover — defensive
         logger.debug("Pixel conversion from CG data failed: %s", exc)
         return None
@@ -185,6 +228,7 @@ def _capture_one_cg(region: Optional[Tuple[int, int, int, int]] = None) -> Optio
 
 def _capture_one_screencapture(
     region: Optional[Tuple[int, int, int, int]] = None,
+    timeout: float = 2.0,
 ) -> Optional[Image.Image]:
     """Capture a single frame using the ``screencapture`` CLI (from ``screen.py``).
 
@@ -193,17 +237,64 @@ def _capture_one_screencapture(
 
     Args:
         region: Optional ``(x, y, width, height)`` rectangle to capture.
+        timeout: Maximum seconds to wait for screencapture subprocess (prevents hanging).
 
     Returns:
-        A PIL ``Image.Image`` in RGB mode on success, or ``None`` if screencapture fails.
+        A PIL ``Image.Image`` in RGB mode on success, or ``None`` if screencapture fails/times out.
     """
     try:
-        from .screen import capture_screen
+        from .screen import capture_screen, ScreenCaptureError
         result = capture_screen(region=region)
-        return result.image
-    except Exception as exc:  # pragma: no cover — defensive
-        logger.debug("screencapture fallback failed: %s", exc)
+        if result is not None and result.image is not None:
+            return result.image
+        logger.debug("screencapture returned empty or None result.")
         return None
+    except (ScreenCaptureError, PermissionError, OSError, subprocess.SubprocessError) as exc:  # pragma: no cover — defensive
+        logger.warning(
+            "LiveDisplayFeed screencapture failed (accessibility/permission/subprocess error): %s",
+            exc,
+        )
+        return None
+    except Exception as exc:  # pragma: no cover — defensive
+        logger.debug("Unexpected exception during screencapture fallback: %s", exc)
+        return None
+
+
+def _capture_one_cg_with_timeout(
+    region: Optional[Tuple[int, int, int, int]] = None,
+    timeout: float = 1.0,
+) -> Optional[Image.Image]:
+    """Wrapper around ``_capture_one_cg`` with a hard timeout to prevent hanging.
+
+    CGWindowListCreateImage via pyobjc should be fast but can occasionally block on
+    system resources (e.g., when display is locked or permission denied). This wrapper
+    ensures we never hang more than ``timeout`` seconds per frame capture attempt.
+
+    Args:
+        region: Optional ``(x, y, width, height)`` rectangle to capture.
+        timeout: Maximum seconds to wait for CG capture (default 1s).
+
+    Returns:
+        A PIL ``Image.Image`` in RGB mode on success, or ``None`` if CG capture fails/times out.
+    """
+    result = [None]
+    error = [None]
+
+    def target():
+        try:
+            result[0] = _capture_one_cg(region)
+        except Exception as exc:
+            error[0] = str(exc)
+
+    t = threading.Thread(target=target); t.daemon = True; t.start()
+    t.join(timeout)
+    if t.is_alive():
+        logger.debug("CG capture timed out after %.1fs", timeout)
+        return None
+    if error[0]:
+        logger.debug("CG capture failed: %s", error[0])
+        return None
+    return result[0]
 
 
 # ---------------------------------------------------------------------------

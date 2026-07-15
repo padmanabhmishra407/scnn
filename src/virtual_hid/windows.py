@@ -17,6 +17,37 @@ from typing import Optional, List, Dict, Any, Tuple
 
 logger = logging.getLogger(__name__)
 
+# Cached result of the accessibility permission probe — checked once per process.
+_permission_cache: Optional[bool] = None
+
+
+def _check_accessibility_permission() -> bool:
+    """Probe whether Accessibility (Screen Recording / Input Monitoring) is granted.
+
+    Uses a lightweight System Events query that fails gracefully when permissions are denied.
+    Returns True only if osascript succeeds and produces non-empty output within the timeout.
+    """
+    try:
+        result = subprocess.run(
+            ["osascript", "-e", 'tell application "System Events" to get name of first process'],
+            capture_output=True, text=True, timeout=3,
+        )
+        return result.returncode == 0 and len(result.stdout.strip()) > 0
+    except Exception:
+        return False
+
+
+def _is_permission_granted() -> bool:
+    """Return cached accessibility-permission status (probe once per process).
+
+    On first call this runs `_check_accessibility_permission()`; subsequent calls reuse the result.
+    When permissions are missing, callers should fall back gracefully rather than crash osascript.
+    """
+    global _permission_cache
+    if _permission_cache is None:
+        _permission_cache = _check_accessibility_permission()
+    return bool(_permission_cache)
+
 
 # AppleScript that calls CGWindowListCopyWindowInfo and returns results as a
 # human-readable text format.  We use CGWindowListCopyWindowInfo with the
@@ -147,11 +178,25 @@ def list_windows() -> List[Dict[str, Any]]:
         List of dicts with keys: id, name, pid, bounds (tuple), is_visible,
         app_name, alpha, layer.
     """
-    raw_output = _list_windows_via_applescript()
+    try:
+        raw_output = _list_windows_via_applescript()
+    except subprocess.CalledProcessError as exc:
+        logger.warning(
+            "Accessibility permissions not granted. Grant 'Screen Recording' + 'Input Monitoring' "
+            "in System Preferences > Security & Privacy > Privacy to enable window enumeration. "
+            "(osascript exit code %s: %s)",
+            exc.returncode, exc.stderr or "",
+        )
+        return []
+    except Exception as exc:  # timeout, FileNotFoundError (no osascript), etc.
+        logger.warning(
+            "Failed to enumerate windows (%s). Grant 'Screen Recording' + 'Input Monitoring' "
+            "in System Preferences > Security & Privacy > Privacy.", type(exc).__name__,
+        )
+        return []
 
-    # Check for fatal errors in output
+    # Check for fatal errors in output (CGWindowListCopyWindowInfo denied internally)
     if raw_output.startswith("FATAL|"):
-        error_msg = raw_output[len("FATAL|"):]
         logger.warning(
             "Accessibility permission denied or CGWindowListCopyWindowInfo failed. "
             "Grant 'Screen Recording' + 'Input Monitoring' permissions to your terminal/app "
@@ -221,7 +266,18 @@ def get_frontmost_window() -> Optional[Dict[str, Any]]:
 
 
 def _get_frontmost_app_name() -> Optional[str]:
-    """Get the name of the frontmost application via osascript."""
+    """Get the name of the frontmost application via osascript.
+
+    Returns None (without crashing) when Accessibility permissions are denied or when the
+    subprocess call fails for any reason. Callers should treat this as a graceful no-op signal.
+    """
+    if not _is_permission_granted():
+        logger.debug(
+            "Accessibility permission check failed — skipping frontmost app query. "
+            "Grant 'Screen Recording' + 'Input Monitoring' in System Preferences > Security & Privacy > Privacy."
+        )
+        return None
+
     script = (
         'try\n'
         '    tell application "System Events"\n'
@@ -237,7 +293,12 @@ def _get_frontmost_app_name() -> Optional[str]:
         if result and result != "":
             return result
     except subprocess.CalledProcessError as e:
-        logger.warning(f"Could not determine frontmost app: {e.stderr}")
+        logger.warning(
+            "Could not determine frontmost app (accessibility denied or osascript error): %s",
+            e.stderr,
+        )
+    except Exception as e:  # timeout, no osascript binary, etc.
+        logger.debug("Frontmost-app query failed unexpectedly: %s", type(e).__name__)
     return None
 
 
