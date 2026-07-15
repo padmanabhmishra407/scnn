@@ -1,0 +1,27 @@
+# Note: virtual_hid.py uses ONLY stdlib + macOS CoreGraphics (no pip deps).
+# No external API keys or cloud services required — fully local injection.
+
+# Core dependencies — neuroscience/cybernetics research
+torch>=2.1.0           # PyTorch for neural network development
+numpy>=1.26.0          # Numerical computing foundation
+scipy>=1.12.0          # Scientific computing and signal processing
+pandas>=2.1.0          # Data manipulation and analysis
+matplotlib>=3.8.0      # Visualization and plotting
+seaborn>=0.13.0        # Statistical visualization
+scikit-learn>=1.4.0    # Machine learning baseline models
+
+# Notebooks and exploration
+jupyter>=1.0.0         # Interactive development environment
+ipython>=8.20.0        # Enhanced Python shell for research
+notebook>=7.0.0        # Jupyter notebook server
+
+# Data handling (neuroscience formats)
+nibabel>=5.2.0         # Neuroimaging data analysis (NIfTI, etc.)
+h5py>=3.10.0           # HDF5 for large dataset storage
+jsonschema>=4.21.0     # Validation and schema management
+
+# Development tools
+black>=24.2.0          # Code formatting
+ruff>=0.3.0            # Fast Python linter and formatter
+mypy>=1.9.0            # Type checking
+pytest>=8.0.0          # Testing framework

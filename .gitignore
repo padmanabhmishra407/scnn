@@ -1,0 +1,106 @@
+# Python artifacts
+*.pyc
+__pycache__/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env*
+*.whl
+
+# Jupyter notebooks cache
+.ipynb_checkpoints/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# ML/Cybersecurity research data (large binary)
+data/*.bin
+data/*.hdf5
+data/*.mat
+*.h5
+*.pkl
+*.npy
+*.npz
+*.pth
+*.pt
+*.onnx
+*.pb
+
+# Logs and temporary files
+logs/
+temp/
+cache/
+tmp/
+*checkpoint*.pt
+*state.json
+
+# Test artifacts
+htmlcov/
+coverage.xml
+.coverage
+.pytest_cache/
+mypy_cache/
+ruff_cache/
+*.pyo
+
+# Research outputs (generated results)
+results/figs/
+plots/
+analyses/
+outputs/
+summaries/
+benchmarks/
+experiments/*/logs/*
+experiments/*/data/*
+
+# Notebook output cells (keep code, remove execution)
+nboutput.ipynb
+*_rendered.ipynb
+
+# Environment variables and secrets (never commit)
+.env
+.env.local
+.env.production
+*.pem
+*.key
+*credentials*
+*secrets*
+aws_credentials.json
+azure_credentials.json
+gcp_service_account.json
+
+# Database files (research data stores, not model weights)
+*.db
+*.sqlite3
+
+# Docker and container artifacts (if used later)
+Dockerfile.*
+.docker/
+docker-compose*.yml
+!docker-compose.yml
+
+# Documentation build outputs
+docs/_build/
+docs/html/
+
+# Type checking cache
+.pytype/
+
+# Auto-generated files
+*.generated.py
+*auto*.py
+generate_*.py

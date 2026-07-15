@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=69.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scnn-research"
+version = "0.1.0"
+description = "Self-Improving Cybernetic Neural Network research project for neuroscience and adaptive systems"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "SCNN Research Team" },
+]
+keywords = ["neuroscience", "cybernetics", "self-improving", "neural-networks", "adaptive-systems"]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.optional-dependencies]
+notebooks = [
+    "jupyter>=1.0.0",
+    "ipython>=8.20.0",
+    "matplotlib>=3.8.0",
+    "seaborn>=0.13.0",
+]
+tests = [
+    "pytest>=8.0.0",
+    "black>=24.2.0",
+    "ruff>=0.3.0",
+    "mypy>=1.9.0",
+]
+dev = ["notebooks", "tests"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# Console scripts entry point — 'pip install -e .' creates `virtual-hid` command
+[project.scripts]
+"virtual-hid" = "virtual_hid.cli.__main__:main"
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 88
+target-version = 'py310'
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
