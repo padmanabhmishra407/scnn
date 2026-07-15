@@ -28,8 +28,11 @@ from .mouse import MouseMixin
 # Phase 2: Vision/UI Reading modules (import lazily to avoid CG deps unless needed)
 try:
     from .screen import capture_screen, capture_window, capture_region, list_screens
-    from .windows import list_windows, get_frontmost_window, find_window, get_app_process
-    from .ocr import ocr_image, ocr_image_tesseract, ocr_text_from_region
+    from .windows import (
+        list_windows, get_frontmost_window, find_window_by_name,
+        find_window_by_app, get_app_pid,
+    )
+    from .ocr import ocr_image, ocr_text_from_region, bpe_tokenize
     from .agent import VisionAgent, Observation, Action
 
     _VISION_MODULES_LOADED = True
