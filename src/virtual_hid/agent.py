@@ -60,18 +60,31 @@ class VisionAgent:
         from . import get_virtual_hid, capture_screen, list_windows, ocr_image
 
         self.hid = get_virtual_hid()
-        self.capture = capture_screen
+        self.capture = capture_screen  # fallback one-shot screen capture
+
+        # Lazy-import live feed so circular deps stay contained. If the module
+        # isn't available (e.g. in test environments), we fall back to capture_screen.
+        try:
+            from .live_feed import get_live_feed
+
+            self.feed = get_live_feed(fps=15)  # type: ignore[assignment]
+        except Exception:
+            self.feed = None  # type: ignore[assignment]
+
         self.list_windows = list_windows
         self.ocr = ocr_image
 
     def observe(self) -> Observation:
-        """Capture and parse the current screen state.
+        """Capture and parse the current screen state using the live feed when available.
 
         Returns:
             Observation with screenshot, windows, frontmost window, and OCR results.
         """
-        # Capture full screen
-        screenshot = self.capture()
+        # Prefer a frame from the live display feed; fall back to one-shot capture
+        if self.feed is not None:
+            screenshot = self.feed.get_frame()
+        else:
+            screenshot = self.capture()
 
         # List all visible windows
         windows = self.list_windows()
@@ -84,12 +97,23 @@ class VisionAgent:
         # Extract text via OCR
         text_regions = self.ocr(screenshot)
 
+        meta: Dict[str, Any] = {"timestamp": __import__("time").time()}
+        if self.feed is not None:
+            try:
+                meta["feed_fps"] = getattr(self.feed, "_fps", None)
+                stats = self.feed.get_stats()
+                meta["frames_captured"] = (
+                    stats.frames_captured if hasattr(stats, "frames_captured") else None  # type: ignore[attr-defined]
+                )
+            except Exception:
+                pass
+
         return Observation(
             screenshot=screenshot,
             windows=windows,
             frontmost_window=frontmost,
             text_regions=text_regions,
-            metadata={"timestamp": __import__("time").time()},
+            metadata=meta,
         )
 
     def act(self, action: Action):

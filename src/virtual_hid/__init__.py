@@ -35,6 +35,20 @@ try:
     from .ocr import ocr_image, ocr_text_from_region, bpe_tokenize
     from .agent import VisionAgent, Observation, Action
 
+    # Live display feed (optional — fails gracefully if unavailable)
+    try:
+        from .live_feed import (
+            LiveDisplayFeed,
+            get_live_feed,
+            FeedStats,
+            LiveFeedError,
+        )
+    except ImportError:
+        LiveDisplayFeed = None  # type: ignore[assignment]
+        get_live_feed = None  # type: ignore[assignment]
+        FeedStats = None  # type: ignore[assignment]
+        LiveFeedError = None  # type: ignore[assignment]
+
     _VISION_MODULES_LOADED = True
 except ImportError as e:
     print(f"⚠️  Phase 2 modules failed to load: {e}")
@@ -137,4 +151,6 @@ __all__ = [
     "_KVK_LALT", "_KVK_RALT", "_KVK_LCTRL", "_KVK_RCTRL",
     "_KVK_RETURN", "_KVK_TAB", "_KVK_SPACE", "_KVK_DELETE", "_KVK_FORWARD_DEL",
     "_KVK_ESCAPE",
+    # Live display feed (graceful fallback if unavailable)
+    "LiveDisplayFeed", "get_live_feed", "FeedStats", "LiveFeedError",
 ]

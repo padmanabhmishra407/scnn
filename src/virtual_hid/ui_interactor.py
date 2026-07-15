@@ -23,6 +23,38 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 
 # ---------------------------------------------------------------------------
+# Live feed preference — try to grab get_live_feed at module level so callers
+# can use it without an extra import. Falls back to None if live_feed is
+# unavailable or fails to initialise (avoids hard breakage on import).
+# ---------------------------------------------------------------------------
+
+_modal_dialog_feed = None  # type: ignore[assignment]
+
+try:
+    from .live_feed import get_live_feed as _get_live_feed_helper
+
+    _modal_dialog_feed = _get_live_feed_helper(fps=15)
+except Exception:
+    _modal_dialog_feed = None
+
+
+def _capture_screen_prefer_feed() -> Any:
+    """Return the latest frame from the live feed if available, else one-shot capture."""
+    if _modal_dialog_feed is not None:
+        try:
+            return _modal_dialog_feed.get_frame()
+        except Exception:
+            pass
+
+    # Fallback to a one-shot screen capture via CoreGraphics.
+    try:
+        from .screen import capture_screen  # type: ignore[import]
+        return capture_screen()
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Coordinate / Element types
 # ---------------------------------------------------------------------------
 
@@ -329,8 +361,7 @@ def handle_modal_dialog(dialog_text: str) -> str:
     preferred_action = _identify_dialog_action(dialog_text)
 
     try:
-        from ..screen import capture_screen  # type: ignore[import]
-        pil_image = capture_screen()
+        pil_image = _capture_screen_prefer_feed()
         if pil_image is None:
             return "unknown"
 
