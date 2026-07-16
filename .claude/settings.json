@@ -1,5 +1,14 @@
 {
   "enabledPlugins": {
     "codex@openai-codex": true
+  },
+  "mcpServers": {
+    "virtual_hid": {
+      "command": "python3",
+      "args": ["-m", "virtual_hid.mcp_server"],
+      "env": {
+        "PROJECT_ROOT": "/Users/padmanabhmishra/Documents/scnn"
+      }
+    }
   }
 }

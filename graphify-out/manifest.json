@@ -1,0 +1,227 @@
+{
+  ".claude/mcp_server/server.py": {
+    "mtime": 1784152971.7328153,
+    "ast_hash": "252d45acbcb2b478b5afbd686191661c",
+    "semantic_hash": ""
+  },
+  ".claude/mcp_server/tracker.py": {
+    "mtime": 1784157027.713776,
+    "ast_hash": "e516432fab14193b0f91e5d38d6d5d0a",
+    "semantic_hash": ""
+  },
+  ".claude/settings.json": {
+    "mtime": 1784225185.9283965,
+    "ast_hash": "9e39716a9029a3f7a207d26874fa3442",
+    "semantic_hash": ""
+  },
+  ".claude/settings.local.json": {
+    "mtime": 1784199042.549442,
+    "ast_hash": "8c0ac8c166df7fe99a201b533aba0939",
+    "semantic_hash": ""
+  },
+  "install_agentworld.sh": {
+    "mtime": 1784221414.5545201,
+    "ast_hash": "b0286b01833f5c7261b1e380e41c726a",
+    "semantic_hash": ""
+  },
+  "pure_airllm.py": {
+    "mtime": 1784222071.5837762,
+    "ast_hash": "47fe3ce0af8ed7d7ca0000c06d5a92f9",
+    "semantic_hash": ""
+  },
+  "pyproject.toml": {
+    "mtime": 1784129673.9833698,
+    "ast_hash": "cecc77006b315f4fd84526e9f08ee4ec",
+    "semantic_hash": ""
+  },
+  "scripts/git_helper.sh": {
+    "mtime": 1784200607.140409,
+    "ast_hash": "0a175d8b6b63b89b5168f83b8f224dea",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/__init__.py": {
+    "mtime": 1784190027.1584377,
+    "ast_hash": "fdd8bb53567e78cd0a59a544361cd639",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/_core.py": {
+    "mtime": 1784211187.812806,
+    "ast_hash": "d22d94f6d1356163f90d548331cafddd",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/_vkeys.py": {
+    "mtime": 1784108817.0596988,
+    "ast_hash": "f8ffe50f6e0b1730142ae2a528ad9e3d",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/accessibility.py": {
+    "mtime": 1784211274.9250104,
+    "ast_hash": "0b9574156d0092db0dc7c6c3b4efd45b",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/agent.py": {
+    "mtime": 1784190041.3081288,
+    "ast_hash": "e9540f00addce0204e27f52d6deb9c22",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/ax_ui_element.py": {
+    "mtime": 1784224528.215385,
+    "ast_hash": "1b1137444b012715f4cfd3fe6161e77c",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/cli/__main__.py": {
+    "mtime": 1784079060.3747814,
+    "ast_hash": "fba9092c58693934a28d8efb31c627b3",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/keyboard.py": {
+    "mtime": 1784129147.5851893,
+    "ast_hash": "20f57a8bbb5e9e99211b19bec49afea9",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/live_feed.py": {
+    "mtime": 1784112689.258858,
+    "ast_hash": "848780fcaf4275f75ae3f076334301fd",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/mcp_server.py": {
+    "mtime": 1784225162.785893,
+    "ast_hash": "b27cf767e4eb2d4e8ec033e5213ef670",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/mouse.py": {
+    "mtime": 1784194980.3586817,
+    "ast_hash": "a9a24c49bf6af5ce4c9cc720efb9094d",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/ocr.py": {
+    "mtime": 1784111823.734719,
+    "ast_hash": "06f9059a6d771cffdeafc180f3697cff",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/screen.py": {
+    "mtime": 1784083585.3490674,
+    "ast_hash": "c19eda37f087662b3574a7e2a1def3a5",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/ui_interactor.py": {
+    "mtime": 1784100148.02427,
+    "ast_hash": "feee8ec9a857d508f0c65711be19dc1c",
+    "semantic_hash": ""
+  },
+  "src/virtual_hid/windows.py": {
+    "mtime": 1784111993.6507914,
+    "ast_hash": "a9f65bdc82822eee2bb5afc64d03b6db",
+    "semantic_hash": ""
+  },
+  "stale_tests/test_cg_debug.py": {
+    "mtime": 1784201897.1661618,
+    "ast_hash": "d115e851cdd0afa4ac514a6c93d0fca9",
+    "semantic_hash": ""
+  },
+  "stale_tests/test_cg_debug2.py": {
+    "mtime": 1784072763.236578,
+    "ast_hash": "404a9ef06f5004f814264339e5cda414",
+    "semantic_hash": ""
+  },
+  "stale_tests/test_cg_event.py": {
+    "mtime": 1784202008.592822,
+    "ast_hash": "71f47a9e6aaea4dafe1fd928bc3a00af",
+    "semantic_hash": ""
+  },
+  "stale_tests/test_hid_inject.py": {
+    "mtime": 1784202013.901428,
+    "ast_hash": "e6fcb86c09e3b81858f75eddad015bfa",
+    "semantic_hash": ""
+  },
+  "stale_tests/test_hid_simple.py": {
+    "mtime": 1784202019.2375503,
+    "ast_hash": "238da04ad4c8219aa5ae2d6630e92f48",
+    "semantic_hash": ""
+  },
+  "stale_tests/test_minimal_hid.py": {
+    "mtime": 1784072996.9384997,
+    "ast_hash": "3d693c19f7cc1adfdad63c7ed644b2d1",
+    "semantic_hash": ""
+  },
+  "stale_tests/virtual_hid_cli.py": {
+    "mtime": 1784073310.877141,
+    "ast_hash": "f015c87a9d587b31b8e3985396fdd07c",
+    "semantic_hash": ""
+  },
+  "stale_tests/virtual_hid_original.py": {
+    "mtime": 1784073234.099148,
+    "ast_hash": "f931c0a062c80b4551eeba1f805e33b5",
+    "semantic_hash": ""
+  },
+  "tests/test_cli.py": {
+    "mtime": 1784122645.4201782,
+    "ast_hash": "8da6d80d17ecdeaf97928d50b00da4ce",
+    "semantic_hash": ""
+  },
+  "tests/test_keyboard.py": {
+    "mtime": 1784080999.670845,
+    "ast_hash": "1fedf4359921a9ee3ce5fcbd7928ee34",
+    "semantic_hash": ""
+  },
+  "tests/test_live_feed.py": {
+    "mtime": 1784123729.5156302,
+    "ast_hash": "f79d2dcb88f296cd2ff3995e78f3bd6e",
+    "semantic_hash": ""
+  },
+  "tests/test_mouse.py": {
+    "mtime": 1784190758.320964,
+    "ast_hash": "75afbc2714d0c63d5beed26beae0d061",
+    "semantic_hash": ""
+  },
+  "tests/test_ui_interactor.py": {
+    "mtime": 1784090355.9051554,
+    "ast_hash": "6d446a00a587c4395e04360e06479fb7",
+    "semantic_hash": ""
+  },
+  "tests/test_vkeys.py": {
+    "mtime": 1784113170.0663445,
+    "ast_hash": "dc9490c952cbeb6da4373a2f1b665f31",
+    "semantic_hash": ""
+  },
+  ".claude/commands/handoff.md": {
+    "mtime": 1784198430.0534832,
+    "ast_hash": "45984d9facade73d2e6dce40fbd953cb",
+    "semantic_hash": ""
+  },
+  ".claude/skills/auto-handoff/SKILL.md": {
+    "mtime": 1784198114.5094004,
+    "ast_hash": "97173fc5b46344618f2519203be2dc03",
+    "semantic_hash": ""
+  },
+  ".claude/skills/handoff/SKILL.md": {
+    "mtime": 1784198403.755155,
+    "ast_hash": "324e2e1abba1c0ef80e31c9d0e3eb91a",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1784070753.6438217,
+    "ast_hash": "f75cd19037a8e6fd1422c0969f372670",
+    "semantic_hash": ""
+  },
+  "COMPUTER_USE_SETUP.md": {
+    "mtime": 1784070365.4166493,
+    "ast_hash": "6d85d89b48af810d2e2ff3953965de13",
+    "semantic_hash": ""
+  },
+  "PHASE1_PHASE2_FINAL_REPORT.md": {
+    "mtime": 1784090721.6604645,
+    "ast_hash": "586e8b233aa1985ff1e22c0ef0d02388",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1784067774.1307323,
+    "ast_hash": "15b54a958cccf7ec5066132a3e0eb26a",
+    "semantic_hash": ""
+  },
+  "requirements.txt": {
+    "mtime": 1784071392.5320542,
+    "ast_hash": "05412f015d137f617df0dd8ea74f43ae",
+    "semantic_hash": ""
+  }
+}

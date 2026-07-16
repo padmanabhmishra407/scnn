@@ -28,7 +28,11 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from virtual_hid.windows import list_windows as _list_windows, get_frontmost_window as _get_frontmost_window
-from virtual_hid.accessibility import read_frontmost_elements, find_element_by_title, click_element_at, type_into_element
+from virtual_hid.ax_ui_element import (
+    enumerate_frontmost_app_elements as _enumerate_ax,
+    enumerate_elements_by_app as _enumerate_by_app,
+    _get_frontmost_pid,
+)
 
 
 def _send_response(msg_id: Optional[str], result: Any):
@@ -73,10 +77,9 @@ def _handle_get_frontmost_window(params: Dict[str, Any]):
 def _handle_read_elements(params: Dict[str, Any]):
     """Read accessibility elements from the frontmost application (digital UI reading)."""
     try:
-        max_depth = params.get("max_depth", 5)
-        role_filter = params.get("role")  # Optional filter for specific roles like "AXButton"
+        role_filter = params.get("role")  # Optional filter for specific roles like "button"
 
-        elements = read_frontmost_elements()
+        elements = _enumerate_ax()
 
         if role_filter:
             elements = [e for e in elements if e["role"] == role_filter]
@@ -87,33 +90,80 @@ def _handle_read_elements(params: Dict[str, Any]):
 
 
 def _handle_click_element_by_title(params: Dict[str, Any]):
-    """Click an element by its title text. Returns True if successful."""
+    """Click an element by its title text substring. Returns True if successful."""
     try:
+        from virtual_hid._core import _CgAPI
+        from virtual_hid.mouse import MouseMixin
+
         title = params.get("title")
         if not title:
             return {"error": "Missing 'title' parameter"}
 
-        element = find_element_by_title(title)
-        if not element:
-            return {"success": False, "message": f"No element found with title matching '{title}'"}
+        # Find matching elements via AX enumeration.
+        all_elements = _enumerate_ax()
+        matches = [e for e in all_elements if (e.get("title", "") or "").lower().find(title.lower()) >= 0]
 
-        x, y = element["position"]
-        success = click_element_at((x, y))
-        return {"success": success, "element": element}
+        if not matches:
+            return {
+                "success": False,
+                "message": f"No element found with title matching '{title}'",
+                "hint": "Use read_elements to see available labels first.",
+            }
+
+        target = matches[0]
+        position = target.get("position")
+        if not position:
+            return {"success": False, "message": f"Element '{target['title']}' has no position."}
+
+        x, y = position
+
+        # Inject mouse click via virtual_hid MouseMixin.
+        api = _CgAPI()
+        mixin = MouseMixin.__new__(MouseMixin)
+        mixin._api = api
+        mixin.click(button="left", x=float(x), y=float(y))
+
+        return {"success": True, "element": target}
     except Exception as exc:
+        import traceback
+        traceback.print_exc()
         return {"error": str(exc)}
 
 
 def _handle_type_string(params: Dict[str, Any]):
-    """Type text into the currently focused element."""
+    """Type text into the currently focused element via virtual_hid keyboard injection."""
     try:
+        from virtual_hid._core import _CgAPI
+        from virtual_hid.keyboard import KeyboardMixin
+
         text = params.get("text", "")
         if not text:
             return {"success": False, "message": "Missing 'text' parameter"}
 
-        success = type_into_element(None, text)  # type_into_element doesn't need element for focus typing
-        return {"success": success}
+        api = _CgAPI()
+        mixin = KeyboardMixin.__new__(KeyboardMixin)
+        mixin._api = api
+        # Initialize letter vkey map (normally done in __init__).
+        mixin._letter_vkeys = {}
+        from virtual_hid._vkeys import get_vkey as _get_vkey_key
+        for c in "abcdefghijklmnopqrstuvwxyz":
+            upper = c.upper()
+            try:
+                mixin._letter_vkeys[c] = _get_vkey_key(upper)
+            except KeyError:
+                pass
+
+        # Use type_string if available, else character-by-character injection.
+        if hasattr(mixin, "type_string"):
+            mixin.type_string(text)
+        else:
+            for ch in text:
+                mixin.type_char(ch)
+
+        return {"success": True, "typed_text": text}
     except Exception as exc:
+        import traceback
+        traceback.print_exc()
         return {"error": str(exc)}
 
 
