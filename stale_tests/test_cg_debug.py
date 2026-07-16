@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Skip in CI / subprocess contexts (requires macOS Accessibility permissions)."""
 import os as _os
-if bool(_os.environ.get('CG_HID_NO_MOUSE', '')):
+# Match _core.py's exact match logic: only skip when explicitly set to "1"
+if _os.environ.get('CG_HID_NO_MOUSE', '') == '1':
     print('[skipped — permission-guarded]')
     import sys; sys.exit(0)
 

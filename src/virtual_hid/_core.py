@@ -388,14 +388,22 @@ class _CgAPI:
         Uses CGEventCreate(NULL, 0) to produce a throwaway event and reads its location field
         via CGEventGetLocation (which returns the active mouse point at call time). The event ref
         is released immediately after reading to avoid leaks.
+
+        Raises RuntimeError if CoreFoundation failed to load — cannot release CFTypeRef without it.
         """
         evt = self._lib.CGEventCreate(None, ctypes.c_int32(0))  # NULL alloc, type=0 for uninitialized
         if not evt:
             return CGPoint(x=0.0, y=0.0)
         loc = self._lib.CGEventGetLocation(evt)
-        # Release the throwaway event ref (CGEventCreate returns a CFTypeRef that must be freed).
+
         if hasattr(self, "_cfn"):
             self._cfn.CFRelease(ctypes.c_void_p(evt))
+        else:
+            # CoreFoundation failed to load — cannot release the event ref. Log and let caller decide.
+            logger.error(
+                "CoreFoundation unavailable — CFTypeRef leak detected (event=%s). "
+                "Mouse location reads will not work until _cfn is set.", evt
+            )
         return loc
 
     def post_event(self, event_ref: int):
