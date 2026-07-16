@@ -33,8 +33,11 @@ kCGHIDEventTap: int = 0
 kCGSessionEventTap: int = 1
 kCGAnnotatedSessionEventTap: int = 2
 
-# kCGHIDEventTapState = 0x80000002 (virtual event source state -- "no accessibility required").
-kCGHIDEventTapState: int = 0x80000002
+# CGEventSourceStateID values for CGEventSourceCreate.
+# kCGEventSourceStatePrivate = -1 (independent state table)
+# kCGEventSourceStateCombinedSessionState = 0 (combined session, default)
+# kCGEventSourceStateHIDSystemState = 1 (HID hardware level — best for virtual HID injection).
+kCGHIDEventTapState: int = 1  # kCGEventSourceStateHIDSystemState
 
 
 # ---------------------------------------------------------------------------
@@ -278,11 +281,11 @@ class _CgAPI:
         fn.argtypes = [ctypes.c_int32, ctypes.c_void_p]
         fn.restype = None  # void
 
-        # CGEventRef CGEventCreate(CFAllocatorRef alloc, CGEventType type) -- NULL alloc + type=0
-        # creates an uninitialized event used solely to read the current cursor location via
-        # CGEventGetLocation. The returned ref MUST be released with CFRelease after reading.
+        # CGEventRef CGEventCreate(CFAllocatorRef alloc) -- NULL alloc creates an uninitialized event.
+        # Used solely to read the current cursor location via CGEventGetLocation. The returned ref
+        # MUST be released with CFRelease after reading. Public API takes exactly 1 argument.
         fn = getattr(lib, "CGEventCreate")
-        fn.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+        fn.argtypes = [ctypes.c_void_p]
         fn.restype = ctypes.c_void_p
 
         # CGPoint CGEventGetLocation(CGEventRef event) -- returns the active cursor point at call time.
@@ -385,25 +388,28 @@ class _CgAPI:
     def get_current_mouse_location(self) -> CGPoint:
         """Return the current cursor position as a CGPoint by creating an uninitialized event.
 
-        Uses CGEventCreate(NULL, 0) to produce a throwaway event and reads its location field
+        Uses CGEventCreate(NULL) to produce a throwaway event and reads its location field
         via CGEventGetLocation (which returns the active mouse point at call time). The event ref
         is released immediately after reading to avoid leaks.
 
         Raises RuntimeError if CoreFoundation failed to load — cannot release CFTypeRef without it.
         """
-        evt = self._lib.CGEventCreate(None, ctypes.c_int32(0))  # NULL alloc, type=0 for uninitialized
+        evt = self._lib.CGEventCreate(None)  # NULL alloc; public API takes exactly 1 arg
         if not evt:
             return CGPoint(x=0.0, y=0.0)
+
         loc = self._lib.CGEventGetLocation(evt)
 
-        if hasattr(self, "_cfn"):
+        # Always release the throwaway event ref after reading location. Guarded by 'if evt' to
+        # prevent CFRelease on NULL/invalid refs (which would crash via CoreFoundation assertion).
+        if evt and hasattr(self, "_cfn"):
             self._cfn.CFRelease(ctypes.c_void_p(evt))
-        else:
-            # CoreFoundation failed to load — cannot release the event ref. Log and let caller decide.
+        elif evt:
             logger.error(
                 "CoreFoundation unavailable — CFTypeRef leak detected (event=%s). "
                 "Mouse location reads will not work until _cfn is set.", evt
             )
+
         return loc
 
     def post_event(self, event_ref: int):
