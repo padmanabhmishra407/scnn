@@ -122,7 +122,7 @@ if __name__ == "__main__":
     test_help_shows_subcommands()
     test_type_subcommand_parses()
     test_hotkey_subcommand_parses()
-    test_click_subcommand_parses()
-    test_scroll_subcommand_parses()
+    test_click_subcommand_parses_coords()  # matches function name, not the subcommand name
+    test_scroll_subcommand_parses_direction()
     test_demo_subcommand_parses()
     print("✅ All CLI tests passed!")

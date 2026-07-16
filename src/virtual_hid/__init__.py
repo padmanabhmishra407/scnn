@@ -20,7 +20,17 @@ Reference:
 
 import time as _time
 
-from ._core import _CgAPI, kCGHIDEventTap, kCGHIDEventTapState
+from ._core import (
+    _CgAPI, kCGHIDEventTap, kCGHIDEventTapState,
+    # New mouse event type constants for right/other button injection.
+    kCGEventRightMouseDown, kCGEventRightMouseUp,
+    kCGEventOtherMouseDown, kCGEventOtherMouseUp,
+    # kCGEventMouseMoved (5) used with delta fields for RELATIVE movement.
+    kCGEventMouseMoved,
+    # Delta field IDs and scroll unit enums.
+    kCGMouseEventDeltaX, kCGMouseEventDeltaY,
+    kCGScrollEventUnitLine, kCGScrollEventUnitPixel,
+)
 from ._vkeys import get_vkey as _get_vkey_key
 from .keyboard import KeyboardMixin
 from .mouse import MouseMixin
@@ -73,22 +83,12 @@ class VirtualHID(KeyboardMixin, MouseMixin):
 
     Attributes:
         _api (_CgAPI): The low-level ctypes wrapper around CoreGraphics functions.
-        _event_source (int): Cached CGEventSourceRef for mouse injection.
+            Event source is accessed directly via ``self._api.event_source``.
     """
 
     def __init__(self):
-        # Initialize the _CgAPI layer first — creates event source, binds function signatures.
-        # In non-interactive/test contexts, _CgAPI skips CGEventSourceCreate entirely to avoid
-        # blocking on macOS Accessibility permission prompts (keyboard-only mode).
-        self._api = _CgAPI()
-        if self._api._event_source:
-            # Only create a new event source if the constructor didn't already do so
-            self._event_source = self._api.create_event_source(kCGHIDEventTapState)
-            if not self._event_source:
-                raise RuntimeError("Failed to create CoreGraphics HID event source")
-        else:
-            # Use the cached value from _safe_create_event_source (0 means no event source available)
-            self._event_source = 0
+        super().__init__()  # sets up _letter_vkeys, modifier map
+        self._api = _CgAPI()  # skips CGEventSourceCreate in CI/subprocess (keyboard-only mode)
 
     # -- Convenience wrappers for common operations --------------------------
 
@@ -109,6 +109,12 @@ class VirtualHID(KeyboardMixin, MouseMixin):
         # Scroll up once
         print("🔄 Scrolling up 2 clicks...")
         self.scroll(clicks=2, direction="up")
+        _time.sleep(0.3)
+
+        # Move mouse relative by 50 points right -- visible cursor displacement confirms injection.
+        print("🖱️  Moving mouse 50 points right (relative)...")
+        self.move_mouse(dx=50, dy=0)
+        _time.sleep(0.2)
 
         print("\n✅ Demo complete. Virtual HID is live and injecting events.")
 
@@ -158,6 +164,12 @@ __all__ = [
     "_KVK_LALT", "_KVK_RALT", "_KVK_LCTRL", "_KVK_RCTRL",
     "_KVK_RETURN", "_KVK_TAB", "_KVK_SPACE", "_KVK_DELETE", "_KVK_FORWARD_DEL",
     "_KVK_ESCAPE",
+    # New mouse event type and field constants exposed for user convenience.
+    "kCGEventRightMouseDown", "kCGEventRightMouseUp",
+    "kCGEventOtherMouseDown", "kCGEventOtherMouseUp",
+    "kCGEventMouseMoved",
+    "kCGMouseEventDeltaX", "kCGMouseEventDeltaY",
+    "kCGScrollEventUnitLine", "kCGScrollEventUnitPixel",
     # Live display feed (graceful fallback if unavailable)
     "LiveDisplayFeed", "get_live_feed", "FeedStats", "LiveFeedError",
 ]

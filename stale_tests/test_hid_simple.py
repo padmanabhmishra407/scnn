@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Minimal HID injection test — no sleeps, just event creation."""
+"""Skip in CI / subprocess contexts (requires macOS Accessibility permissions)."""
+import os as _os
+if bool(_os.environ.get('CG_HID_NO_MOUSE', '')):
+    print('[skipped — permission-guarded]')
+    import sys; sys.exit(0)
+
 import ctypes, ctypes.util
 
 lib = ctypes.CDLL(ctypes.util.find_library("CoreGraphics"))

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Debug CGEvent injection step by step with explicit error reporting."""
+"""Skip in CI / subprocess contexts (requires macOS Accessibility permissions)."""
+import os as _os
+if bool(_os.environ.get('CG_HID_NO_MOUSE', '')):
+    print('[skipped — permission-guarded]')
+    import sys; sys.exit(0)
+
 import ctypes, ctypes.util, sys
 
 LOG = "/tmp/hid_debug.log"

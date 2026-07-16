@@ -37,6 +37,8 @@ class Action:
     clicks: int = 1
     direction: str = "down"
     keys: List[str] = field(default_factory=list)
+    dx: int = 0
+    dy: int = 0
 
 
 class VisionAgent:
@@ -131,8 +133,7 @@ class VisionAgent:
         elif action.type == "hotkey":
             self.hid.hotkey(*action.keys)
         elif action.type == "move":
-            # move_mouse is stubbed — use osascript for now
-            print("⚠️  move_mouse not yet implemented (requires CGEventSetLocation)")
+            self.hid.move_mouse(dx=action.dx, dy=action.dy)
 
     def interact(self, prompt: str) -> Observation:
         """High-level interaction loop: observe → act based on prompt.

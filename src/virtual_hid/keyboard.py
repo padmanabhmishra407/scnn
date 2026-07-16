@@ -14,7 +14,7 @@ The mixin accesses self._api (_CgAPI instance) and self._letter_vkeys (a→vkey 
 
 import time
 
-from ._vkeys import _MODIFIER_MAP, get_vkey
+from ._vkeys import _ALL_VKEYS as _VKEYS, _MODIFIER_MAP, get_vkey
 
 
 class KeyboardMixin:
@@ -23,17 +23,16 @@ class KeyboardMixin:
     # Re-export module-level modifier map so existing callers can use self._MODIFIER_MAP.
     _MODIFIER_MAP = _MODIFIER_MAP
 
+    # Build letter→vkey lookup table once at class-definition time (A=KVK_A, B=KVK_B, ...).
+    _letter_vkeys_cache = {
+        chr(ord("a") + i): _VKEYS[chr(ord("A") + i)]
+        for i in range(26)
+        if chr(ord("A") + i) in _VKEYS
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Build letter→vkey lookup table once at init (A=KVK_A, B=KVK_B, ...)
-        from ._vkeys import _ALL_VKEYS as vkeys
-
-        self._letter_vkeys: dict[str, int] = {}
-        for i in range(26):
-            letter = chr(ord("a") + i)  # lowercase a-z — these are the type_char() input keys
-            upper = letter.upper()       # uppercase A-Z — matches _ALL_VKEYS keys
-            if upper in vkeys:
-                self._letter_vkeys[letter] = vkeys[upper]
+        self._letter_vkeys = KeyboardMixin._letter_vkeys_cache  # class-level shared dict (read-only)
 
     def _resolve_modifier(self, name: str):
         """Resolve a modifier key name to its vkey constant."""
@@ -63,17 +62,29 @@ class KeyboardMixin:
 
         self._api.keyboard_up(int(vkey))
 
+    # Map single-char whitespace/control symbols to their _vkeys names for reliable lookup.
+    _WS_TO_VKEY_NAME = {
+        ' ': 'SPACE', '\t': 'TAB', '\n': 'RETURN', '\r': 'RETURN',
+    }
+
+    # Local fallback for common punctuation/symbols — maps char → Carbon HID vkey code.
+    # These are known Apple ApplicationServices key codes for a US QWERTY layout.
+    _PUNCT_TO_VKEY = {
+        '.': 0x2E, ',': 0x2F, ';': 0x33, "'": 0x34,    # period comma semicolon apostrophe
+        '[': 0x21, ']': 0x19, '\\': 0x22,              # brackets backslash (non-colliding)
+        '/': 0x27, '=': 0x1B, '-': 0x1A, '+': 0x2D,    # slash equals minus plus
+        '@': 0x29, '#': 0x39, '$': 0x3F, '%': 0x40,    # at hash dollar percent
+        '^': 0x41, '&': 0x42, '*': 0x43, '(': 0x44,    # caret ampersand star paren-open
+        ')': 0x45, '!': 0x46, '?': 0x47, '~': 0x48,    # paren-close exclaim question tilde
+        '_': 0x49, '`': 0x32,                          # underscore grave (GRAVE is 0x32)
+    }
+
     def type_char(self, char):
         """Type a single character. Handles uppercase by auto-pressing shift before the letter.
 
         Supports: A-Z/a-z (via _letter_vkeys), digits 0-9, space, tab, return, and common
         punctuation (/ . , ; ' [ ] \\ = - + @ # $ % ^ & * ( ) ! ? ~ _) via local fallback map.
         """
-        # Map single-char whitespace/control symbols to their _vkeys names for reliable lookup
-        _WS_TO_VKEY_NAME = {
-            ' ': 'SPACE', '\t': 'TAB', '\n': 'RETURN', '\r': 'RETURN',
-        }
-
         vkey = None
         is_upper_letter = len(char) == 1 and char.isupper() and char.lower() in self._letter_vkeys
 
@@ -81,27 +92,17 @@ class KeyboardMixin:
             # Shift + letter: use the lowercase key code from _letter_vkeys
             vkey = self._letter_vkeys[char.lower()]
         elif not is_upper_letter and char in self._letter_vkeys:
-            # Lowercase letter — direct lookup from init-time table
+            # Lowercase letter — direct lookup from class-level table
             vkey = self._letter_vkeys[char]
         else:
             # Try whitespace/control mapping first (space, tab, newline, etc.)
-            name = _WS_TO_VKEY_NAME.get(char)
+            name = KeyboardMixin._WS_TO_VKEY_NAME.get(char)
             if name is not None:
                 vkey = get_vkey(name)
 
             if vkey is None and len(char) == 1:
                 # Local fallback for common punctuation/symbols — maps char → Carbon HID vkey code.
-                # These are known Apple ApplicationServices key codes for a US QWERTY layout.
-                _PUNCT_TO_VKEY = {
-                    '.': 0x2E, ',': 0x2F, ';': 0x33, "'": 0x34,    # period comma semicolon apostrophe
-                    '[': 0x21, ']': 0x19, '\\': 0x22,              # brackets backslash (non-colliding)
-                    '/': 0x27, '=': 0x1B, '-': 0x1A, '+': 0x2D,    # slash equals minus plus
-                    '@': 0x29, '#': 0x39, '$': 0x3F, '%': 0x40,    # at hash dollar percent
-                    '^': 0x41, '&': 0x42, '*': 0x43, '(': 0x44,    # caret ampersand star paren-open
-                    ')': 0x45, '!': 0x46, '?': 0x47, '~': 0x48,    # paren-close exclaim question tilde
-                    '_': 0x49, '`': 0x32,                          # underscore grave (GRAVE is 0x32)
-                }
-                vkey = _PUNCT_TO_VKEY.get(char)
+                vkey = KeyboardMixin._PUNCT_TO_VKEY.get(char)
 
             if vkey is None:
                 # Last resort: general vkey lookup for symbols defined in _ALL_VKEYS (e.g. GRAVE, MINUS)

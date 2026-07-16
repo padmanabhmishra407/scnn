@@ -104,3 +104,17 @@ docs/html/
 *.generated.py
 *auto*.py
 generate_*.py
+
+# Session/debug test scripts (one-off mouse injection debugging)
+run_mouse_test*.py
+test_mouse_*.py
+verify_mouse_injection.py
+computer_use_agent.py
+
+# Review/findings artifacts (json dumps from subagent reviews)
+*_findings.json
+angle_c_findings.json
+code-review-findings.json
+
+# Session handoff notes (not part of codebase)
+HANDOFF.md
